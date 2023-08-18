@@ -1,0 +1,285 @@
+-- This script was made by me (@J4V13RY0) to get a role in HD server
+
+-- Declarating variables: Services → Instances → Boolean → Number
+local ContextActionService = game:GetService("ContextActionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local PlayerServ = game:GetService("Players")
+
+local LadderTemplate = ReplicatedStorage:WaitForChild("LadderTemp")
+local Player = PlayerServ.LocalPlayer
+local Tool = script.Parent
+local TrackTemplate = script:WaitForChild("TrackTemp")
+local PlayerGui = Player:WaitForChild("PlayerGui")
+local LadderAbGui = PlayerGui:WaitForChild("LadderAbility")
+local MainFrameLadderAb = LadderAbGui:WaitForChild("Main")
+local LadderAbilityBar = MainFrameLadderAb:WaitForChild("Bar")
+local AltitudeGui = PlayerGui:WaitForChild("Altitude")
+local MainFrameAltitude = AltitudeGui:WaitForChild("Main")
+local DataLabel = MainFrameAltitude:WaitForChild("DataLabel")
+local Mouse = Player:GetMouse()
+
+local CanActivateAbility = true
+local AbilityOn = false
+local Equipped = false
+local AbilityCooldown = 7.5
+local AbilityDuration = 5
+local LadderDistance = 5
+local LadderHeight = 11
+local SpeedBoost = 10
+local JumpBoost = 5
+
+-- Getting player's character
+local Character
+repeat
+	task.wait()
+	Character = Player.Character
+until Character
+local HumanoidRP = Character:WaitForChild("HumanoidRootPart")
+local RightFoot = Character:WaitForChild("RightFoot")
+local Humanoid = Character:WaitForChild("Humanoid")
+
+-- Create a function to obtain the CFrame of the Ladder, with the parameter of the position
+local GetLadderCFrame = (function(LadderPosition)
+	local HRPOrient = HumanoidRP.Orientation
+	local RadOriX = math.rad(HRPOrient.X)
+	local RadOriY = math.rad(HRPOrient.Y)
+	local RadOriZ = math.rad(HRPOrient.Z)
+	
+	local FinalCFrame = CFrame.new(LadderPosition) * CFrame.Angles(RadOriX, RadOriY, RadOriZ)
+	return FinalCFrame
+end)
+
+-- Create an ability: when you press E you get a jump and speed boost and a bar shows the restant time of the ability
+local AbilityInfo1 = TweenInfo.new(AbilityDuration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, 0, false)
+local AbilityInfo2 = TweenInfo.new(AbilityCooldown, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, 0, false)
+local ChargeAbilityMove = TweenService:Create(LadderAbilityBar, AbilityInfo2, {Size = UDim2.new(1, 0, 1, 0)})
+local UseAbilityMove = TweenService:Create(LadderAbilityBar, AbilityInfo1, {Size = UDim2.new(0, 0, 1, 0)})
+local ColorMove1 = TweenService:Create(LadderAbilityBar, AbilityInfo1, {BackgroundColor3 = Color3.fromRGB(255, 0, 0)})
+local ColorMove2 = TweenService:Create(LadderAbilityBar, AbilityInfo2, {BackgroundColor3 = Color3.fromRGB(255, 255, 0)})
+local Ability = (function()
+	if not CanActivateAbility then
+		return
+	end
+	CanActivateAbility = false
+	
+	Humanoid.WalkSpeed += SpeedBoost
+	Humanoid.JumpHeight += JumpBoost
+	UseAbilityMove:Play()
+	ColorMove1:Play()
+	task.wait(AbilityDuration)
+	Humanoid.WalkSpeed = StarterPlayer.CharacterWalkSpeed
+	Humanoid.JumpHeight = StarterPlayer.CharacterJumpHeight
+	task.wait(0.5)
+	ChargeAbilityMove:Play()
+	ColorMove2:Play()
+	task.wait(AbilityCooldown)
+	CanActivateAbility = true
+end)
+
+-- Creating main and mold ladder: Clone ladder for main ladder → Clone ladder for mold ladder → Turn CanCollide off
+local MainLadder = LadderTemplate:Clone()
+MainLadder.Name = "MainLadder"
+MainLadder.Parent = ReplicatedStorage
+
+local LadderMold = LadderTemplate:Clone()
+
+for MoldIndex, MoldChild in pairs(LadderMold:GetChildren()) do
+	if not MoldChild:IsA("BasePart") or MoldChild.Name == "Core" then
+		continue
+	end
+	
+	MoldChild.CanCollide = false
+end
+
+-- Creating a part to track the Y position of where the player is standing
+local TrackPart = TrackTemplate:Clone()
+local FootSize2 = RightFoot.Size.Y / 2
+TrackPart.WeldConstraint.Part1 = HumanoidRP
+TrackPart.Position = Vector3.new(HumanoidRP.Position.X, RightFoot.Position.Y - FootSize2, HumanoidRP.Position.Z)
+TrackPart.Anchored = false
+TrackPart.Parent = Character
+local LadderHeight2 = LadderHeight / 2
+
+-- Create a function that will be connected to Mouse.Button1Down to place / delete the ladder
+local Click = (function()
+	if not Equipped then
+		-- Tool is not equipped: Ignore this click
+		return
+	end
+
+	if LadderMold.Parent == workspace then
+		-- Placing mode is activated: Place the ladder
+		local MainCFrame = GetLadderCFrame(LadderMold.Core.Position)
+		MainLadder:PivotTo(MainCFrame)
+		LadderMold.Parent = ReplicatedStorage
+		MainLadder.Parent = workspace
+
+	elseif MainLadder.SelectionBox.Visible then
+		-- Player is targetting the ladder: "Delete" it
+		MainLadder.Parent = ReplicatedStorage
+		MainLadder.SelectionBox.Visible = false
+	end
+end)
+
+-- Create a function with the rainbow effect for the ladder
+local GiveEffect = (function(EffectLadder)
+	local ColorDuration = 1
+	local ColorInfo = TweenInfo.new(ColorDuration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, 0, false)
+	for MLI, MainLadderChild in pairs(EffectLadder:GetChildren()) do
+		task.spawn(function()
+			if MainLadderChild:IsA("BasePart") and MainLadderChild.Name ~= "Core" then
+				MainLadderChild.Color = Color3.fromRGB(255, 0, 0)
+				local YellowMov = TweenService:Create(MainLadderChild, ColorInfo, {Color = Color3.fromRGB(255, 255, 0)})
+				local GreenMov = TweenService:Create(MainLadderChild, ColorInfo, {Color = Color3.fromRGB(0, 255, 0)})
+				local CyanMov = TweenService:Create(MainLadderChild, ColorInfo, {Color = Color3.fromRGB(0, 255, 255)})
+				local PurpleMov = TweenService:Create(MainLadderChild, ColorInfo, {Color = Color3.fromRGB(170, 0, 255)})
+				local PinkMov = TweenService:Create(MainLadderChild, ColorInfo, {Color = Color3.fromRGB(255, 0, 255)})
+				local RedMov = TweenService:Create(MainLadderChild, ColorInfo, {Color = Color3.fromRGB(255, 0, 0)})
+				while true do
+					YellowMov:Play()
+					task.wait(ColorDuration)
+					GreenMov:Play()
+					task.wait(ColorDuration)
+					CyanMov:Play()
+					task.wait(ColorDuration)
+					PurpleMov:Play()
+					task.wait(ColorDuration)
+					PinkMov:Play()
+					task.wait(ColorDuration)
+					RedMov:Play()
+					task.wait(1)
+				end
+			end
+		end)
+	end
+end)
+
+-- Create a function that creates a new ladder if the last ladder was deleted
+local CreateNewLadder = (function()
+	local LastLadder = workspace:FindFirstChild("MainLadder")
+	if LastLadder then
+		LastLadder.Parent = ReplicatedStorage
+	end
+	
+	MainLadder = LadderTemplate:Clone()
+	MainLadder.Name = "MainLadder"
+	GiveEffect(MainLadder)
+end)
+
+-- Creating main function wich will be connected to RunService.Heartbeat to constantly update
+local Main = (function()
+	-- Check if the player is alive
+	if Humanoid.Health <= 0 then
+		-- Player is dead: Parent ladder to ReplicatedStorage → prevent next code from running
+		MainLadder.Parent = ReplicatedStorage
+		LadderMold.Parent = ReplicatedStorage
+		return
+	end
+	-- Check if the ladder fell into the void
+	if not MainLadder then
+		-- Ladder was destroyed: Create a new one
+		CreateNewLadder()
+		return
+	end
+	if not MainLadder:FindFirstChild("Core") then
+		-- Core was deleted: Create a new ladder
+		CreateNewLadder()
+		return
+	end
+	if MainLadder.Core.Position.Y <= workspace.FallenPartsDestroyHeight then
+		CreateNewLadder()
+	end
+	
+	-- Calculate the altitude of the player
+	local YPos10 = HumanoidRP.Position.Y * 10
+	local FloorPos10 = math.floor(YPos10)
+	local FinalYPos = FloorPos10 / 10
+	local AltitudeText = tostring(FinalYPos)
+	DataLabel.Text = AltitudeText
+	
+	if Equipped then
+		if MainLadder.Parent == workspace then
+			-- Tool equipped and ladder placed so player might want to destroy it: Enable ladder red SelectionBox
+			local Target = Mouse.Target
+			if not Target then
+				--Player's mouse is not pointing to anything: Disable SelectionBox
+				MainLadder.SelectionBox.Visible = false
+				return
+			end
+			if not Target:IsDescendantOf(MainLadder) then
+				-- Player's mouse is not pointing to the ladder: Disable SelectionBox
+				MainLadder.SelectionBox.Visible = false
+				return
+			end
+			MainLadder.SelectionBox.Visible = true
+		else
+			-- Tool equipped but ladder is not placed: Enable placing mode
+			-- Cast a ray to check if there are obstacles on the player's way
+			local RayParams = RaycastParams.new()
+			RayParams.FilterDescendantsInstances = {LadderMold, Character}
+			RayParams.FilterType = Enum.RaycastFilterType.Exclude
+			local LookVector = HumanoidRP.CFrame.LookVector
+			local DistanceVector = LookVector * LadderDistance
+			local HRPPos = HumanoidRP.Position
+			local StandPos = TrackPart.Position.Y
+			local RayOrigin = Vector3.new(HRPPos.X, StandPos, HRPPos.Z)
+			local RaycastResult = workspace:Raycast(HumanoidRP.Position, DistanceVector, RayParams)
+			local MoldPos = HRPPos + DistanceVector
+			if RaycastResult then
+				-- The ray detected obstacles: Calculate the distance that needs to be extracted
+				local UnitLV2 = LookVector.Unit / 2
+				MoldPos = RaycastResult.Position - UnitLV2
+			end
+			
+			local YPosMold = StandPos + LadderHeight2
+			MoldPos = Vector3.new(MoldPos.X, YPosMold, MoldPos.Z)
+			
+			local MoldCFrame = GetLadderCFrame(MoldPos)
+			
+			LadderMold:PivotTo(MoldCFrame)
+			LadderMold.Parent = workspace
+		end
+	else
+		-- Tool is not equipped: Disable placing mode → Disable SelectionBox
+		LadderMold.Parent = ReplicatedStorage
+		MainLadder.SelectionBox.Visible = false
+	end
+end)
+
+-- Connecting the click event to the Click function
+Mouse.Button1Down:Connect(Click)
+
+-- Updating "Equipped" variable: Connecting Tool.Equipped → Connecting Tool.Unequipped
+Tool.Equipped:Connect(function()
+	Equipped = true
+end)
+
+Tool.Unequipped:Connect(function()
+	Equipped = false
+end)
+
+-- Connecting main function to RunService.Heartbeat
+RunService.Heartbeat:Connect(Main)
+
+-- Create an effect for the placing mode
+local TransparencyInfo = TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, math.huge, true)
+for EI, MoldInstance in pairs(LadderMold:GetChildren()) do
+	task.spawn(function()
+		if MoldInstance.Name ~= "Core" then
+			MoldInstance.Transparency = 0.35
+			local MoveEffect = TweenService:Create(MoldInstance, TransparencyInfo, {Transparency = 0.65})
+			MoveEffect:Play()
+		end
+	end)
+end
+
+-- Give the rainbow effect to the ladder
+GiveEffect(MainLadder)
+
+-- Bind the ability with ContextActionService so mobile players can activate it too
+ContextActionService:BindAction("LadderAbility", Ability, true, Enum.KeyCode.E)
+ContextActionService:SetImage("LadderAbility", "rbxassetid://5351484167")
+ContextActionService:SetPosition("LadderAbility", UDim2.new(0.15, 0, 0.5, 0))
